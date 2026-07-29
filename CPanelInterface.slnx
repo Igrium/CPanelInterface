@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CPanelInterface.TestConsole/CPanelInterface.TestConsole.csproj" />
+  <Project Path="CPanelInterface/CPanelInterface.csproj" />
+</Solution>
