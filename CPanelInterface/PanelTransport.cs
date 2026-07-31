@@ -6,9 +6,9 @@ namespace CPanelInterface;
 public class PanelTransport : IDisposable
 {
     private readonly SerialPort _port;
-    
+
     public bool IsOpen => _port.IsOpen;
-    
+
     public PanelTransport(string portName, int baudRate = 9600,
         Parity parity = Parity.None, int dataBits = 8, StopBits stopBits = StopBits.One)
     {
@@ -32,6 +32,7 @@ public class PanelTransport : IDisposable
         while (true)
         {
             int b = _port.ReadByte();
+            if (b == -1) throw new EndOfStreamException("Serial port closed while waiting for a message");
             if (b == '\r') return sb.ToString();
             sb.Append((char)b);
         }
@@ -40,27 +41,30 @@ public class PanelTransport : IDisposable
     public void Dispose()
     {
         _port.Close();
+        GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// A way to query the panel via callbacks instead of blocking
     /// </summary>
     /// <param name="transport">Panel transport to use. It is recommended not to touch this after starting.</param>
     public class Listener(PanelTransport transport) : IDisposable
     {
+        public PanelTransport Transport { get; } = transport;
 
-        public bool IsOpen => transport.IsOpen;
+        public bool IsOpen => Transport.IsOpen;
 
         public delegate void MessageHandler(string message);
+
         public delegate void ErrorHandler(Exception ex);
 
         public event MessageHandler? OnMessage;
         public event ErrorHandler? OnError;
 
         private Thread? _thread;
-        
+
         public bool Running { get; private set; }
-        
+
         public void Start()
         {
             if (Running || _thread != null) throw new InvalidOperationException("Already started");
@@ -73,9 +77,9 @@ public class PanelTransport : IDisposable
         {
             try
             {
-                while (Running && transport.IsOpen)
+                while (Running && Transport.IsOpen)
                 {
-                    OnMessage?.Invoke(transport.PollMessage());
+                    OnMessage?.Invoke(Transport.PollMessage());
                 }
             }
             catch (Exception ex)
@@ -85,21 +89,21 @@ public class PanelTransport : IDisposable
             }
             finally
             {
-                if (transport.IsOpen)
+                if (Transport.IsOpen)
                 {
-                    transport.Dispose();
+                    Transport.Dispose();
                 }
             }
         }
 
-        /**
-         * Dispose of this transport and return immediately.
-         */
+        /// <summary>
+        /// Dispose of this transport and return immediately.
+        /// </summary>
         public void Stop()
         {
             Running = false;
         }
-        
+
         /// <summary>
         /// Dispose of this transport and block until it's complete
         /// </summary>

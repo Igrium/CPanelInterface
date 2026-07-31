@@ -15,15 +15,25 @@ transport.Open();
 Console.WriteLine($"Opened {portName}. Listening for messages (Ctrl+C to exit)...");
 
 using var listener = new PanelTransport.Listener(transport);
-// listener.OnMessage += message => Console.WriteLine($"< {message}");
 listener.OnError += ex => Console.WriteLine($"Error: {ex.Message}");
-listener.Start();
 
-listener.OnMessage += msg =>
+var parser = new PanelParser(listener);
+parser.OnUpdateValue += (row, value) =>
 {
-    var bytes = Convert.FromHexString(msg);
-    Console.WriteLine($"{bytes[0]}: {bytes[1]}");
+    string bits = ToBitString(new BitArray(value));
+
+    if (value.Length >= 3)
+    {
+        JoystickPos pos = JoystickPos.Of(value);
+        Console.WriteLine($"  As joystick: X={pos.X} ({pos.XPercent:F3}), Y={pos.Y} ({pos.YPercent:F3}), Roll={pos.Roll} ({pos.RollPercent:F3})");
+    }
+    else
+    {
+        Console.WriteLine($"Row {row}: {bits} (bytes: {BitConverter.ToString(value)})");
+    }
 };
+
+listener.Start();
 
 Console.CancelKeyPress += (_, e) =>
 {
@@ -31,10 +41,102 @@ Console.CancelKeyPress += (_, e) =>
     listener.Stop();
 };
 
+PrintMenu();
 
 while (listener.IsOpen && listener.Running)
 {
-    Thread.Sleep(200);
+    if (Console.KeyAvailable)
+    {
+        HandleKey(Console.ReadKey(intercept: true).KeyChar, parser);
+    }
+    else
+    {
+        Thread.Sleep(50);
+    }
+}
+
+Console.WriteLine("Listener stopped.");
+
+static void PrintMenu()
+{
+    Console.WriteLine();
+    Console.WriteLine("Commands: [b] query button  [v] query raw/float value  [j] query joystick  [m] show this menu  [Ctrl+C] quit");
+    Console.WriteLine();
+}
+
+static void HandleKey(char key, PanelParser parser)
+{
+    switch (char.ToLowerInvariant(key))
+    {
+        case 'b':
+            QueryButton(parser);
+            break;
+        case 'v':
+            QueryValue(parser);
+            break;
+        case 'j':
+            QueryJoystick(parser);
+            break;
+        case 'm':
+            PrintMenu();
+            break;
+    }
+}
+
+static bool TryReadRow(string prompt, out byte row)
+{
+    Console.Write(prompt);
+    string? input = Console.ReadLine();
+    return byte.TryParse(input, out row);
+}
+
+static void QueryButton(PanelParser parser)
+{
+    if (!TryReadRow("Row: ", out byte row))
+    {
+        Console.WriteLine("Invalid row.");
+        return;
+    }
+
+    Console.Write("Button inbdex: ");
+    if (!int.TryParse(Console.ReadLine(), out int button))
+    {
+        Console.WriteLine("Invalid button index.");
+        return;
+    }
+
+    bool state = parser.GetButtonState(row, button);
+    Console.WriteLine($"Row {row}, button {button}: {(state ? "pressed" : "released")}");
+}
+
+static void QueryValue(PanelParser parser)
+{
+    if (!TryReadRow("Row: ", out byte row))
+    {
+        Console.WriteLine("Invalid row.");
+        return;
+    }
+
+    bool known = parser.GetByteValue(row, out byte value);
+    float percent = parser.GetFloatValue(row);
+    Console.WriteLine($"Row {row}: byte={value} float={percent:F3}{(known ? "" : " (no data received yet, defaulted)")}");
+}
+
+static void QueryJoystick(PanelParser parser)
+{
+    if (!TryReadRow("Row: ", out byte row))
+    {
+        Console.WriteLine("Invalid row.");
+        return;
+    }
+
+    if (!parser.GetJoysickValue(row, out JoystickPos pos))
+    {
+        Console.WriteLine($"Row {row}: no data received yet.");
+        return;
+    }
+
+    Console.WriteLine($"Row {row}: X={pos.X} ({pos.XPercent:F3}), Y={pos.Y} ({pos.YPercent:F3}), Roll={pos.Roll} ({pos.RollPercent:F3})");
 }
 
 // Source - https://stackoverflow.com/a/8991834
@@ -53,7 +155,3 @@ static string ToBitString(BitArray bits)
 
     return sb.ToString();
 }
-
-
-
-Console.WriteLine("Listener stopped.");
