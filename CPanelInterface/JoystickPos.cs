@@ -20,13 +20,13 @@ public record struct JoystickPos
         };
     }
 
-    public static JoystickPos Of(byte[] bytes)
+    public static JoystickPos Of(IList<byte> bytes)
     {
         // Control surface sends Y first
         JoystickPos pos = new();
-        if (bytes.Length > 0) pos.Y = bytes[0];
-        if (bytes.Length > 1) pos.X = bytes[1];
-        if (bytes.Length > 2) pos.Roll = bytes[2];
+        if (bytes.Count > 0) pos.Y = bytes[0];
+        if (bytes.Count > 1) pos.X = bytes[1];
+        if (bytes.Count > 2) pos.Roll = bytes[2];
         return pos;
     }
 }

@@ -19,6 +19,14 @@ public class PanelParser
     
     public event ButtonPressListener? OnPressButton;
 
+    public delegate void EncoderUpdateListener(byte row, byte value);
+    
+    public event EncoderUpdateListener? OnUpdateEncoder;
+    
+    public delegate void JoystickUpdateListener(byte row, JoystickPos pos);
+    
+    public event JoystickUpdateListener? OnUpdateJoystick;
+
     public PanelTransport.Listener Listener { get; init; }
     public PanelTransport Transport => Listener.Transport;
     
@@ -43,11 +51,20 @@ public class PanelParser
 
             byte row = bytes[0];
             byte[] values = bytes.Skip(1).ToArray();
+            
             byte[]? prevVals = _values.GetValueOrDefault(row);
 
             byte prevFlags = prevVals != null ? prevVals[0] : (byte)0xFF;
-            
-            if (!Encoders.Contains(row))
+
+            if (values.Length > 1)
+            {
+                OnUpdateJoystick?.Invoke(row, JoystickPos.Of(values));
+            }
+            else if (Encoders.Contains(row))
+            {
+                OnUpdateEncoder?.Invoke(row, values[0]);
+            }
+            else
             {
                 byte curFlags = values[0];
 

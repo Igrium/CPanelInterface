@@ -18,20 +18,17 @@ using var listener = new PanelTransport.Listener(transport);
 listener.OnError += ex => Console.WriteLine($"Error: {ex.Message}");
 
 var parser = new PanelParser(listener);
-parser.OnUpdateValue += (row, value) =>
-{
-    string bits = ToBitString(new BitArray(value));
 
-    if (value.Length >= 3)
-    {
-        JoystickPos pos = JoystickPos.Of(value);
-        Console.WriteLine(pos);
-    }
-    else
-    {
-        Console.WriteLine($"Row {row}: {value[0]} (bytes: {BitConverter.ToString(value)})");
-    }
+parser.OnUpdateJoystick += (row, joystick) =>
+{
+    Console.WriteLine($"Joystick {row}: ({joystick.X}, {joystick.Y}, {joystick.Roll})");
 };
+
+parser.OnUpdateEncoder += (row, value) =>
+{
+    Console.WriteLine($"Encoder {row}: {value}");
+};
+
 parser.OnPressButton += (row, idx, pressed) =>
 {
     Console.WriteLine($"Row {row}, button {idx}: {(pressed ? "pressed" : "released")}");
