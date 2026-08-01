@@ -2,6 +2,21 @@ using System.Collections.Concurrent;
 
 namespace CPanelInterface;
 
+public record struct ButtonRef
+{
+    public byte Row;
+    public byte Idx;
+
+    public static ButtonRef Of(byte row, byte idx)
+    {
+        return new ButtonRef
+        {
+            Row = row,
+            Idx = idx
+        };
+    }
+}
+
 /// <summary>
 /// Receives and parses messages from a panel
 /// </summary>
@@ -16,7 +31,7 @@ public class PanelParser
 
     public event ValueUpdateListener? OnUpdateValue;
 
-    public delegate void ButtonPressListener(byte row, byte idx, bool pressed);
+    public delegate void ButtonPressListener(ButtonRef button, bool pressed);
     
     public event ButtonPressListener? OnPressButton;
 
@@ -75,7 +90,7 @@ public class PanelParser
                     bool cur = GetBitAsBool(curFlags, i);
                     if (prev != cur)
                     {
-                        OnPressButton?.Invoke(row, i, !cur);
+                        OnPressButton?.Invoke(ButtonRef.Of(row, i), !cur);
                     }
                 }
             }

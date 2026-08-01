@@ -19,7 +19,7 @@ using var listener = new PanelTransport.Listener(transport);
 listener.OnError += ex => Console.WriteLine($"Error: {ex.Message}");
 
 var parser = new PanelParser(listener);
-var sender = new PanelSender(transport);
+var sender = new LedManager(transport);
 
 sender.Reset();
 
@@ -33,10 +33,10 @@ parser.OnUpdateEncoder += (row, value) =>
     Console.WriteLine($"Encoder {row}: {value}");
 };
 
-parser.OnPressButton += (row, idx, pressed) =>
+parser.OnPressButton += (button, pressed) =>
 {
-    Console.WriteLine($"Row {row}, button {idx}: {(pressed ? "pressed" : "released")}");
-    sender.SetLedState(row, idx, pressed);
+    Console.WriteLine($"Row {button.Row}, button {button.Idx}: {(pressed ? "pressed" : "released")}");
+    sender.SetLedState(button, pressed);
 };
 
 listener.Start();
