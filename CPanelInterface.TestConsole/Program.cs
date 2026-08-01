@@ -25,12 +25,16 @@ parser.OnUpdateValue += (row, value) =>
     if (value.Length >= 3)
     {
         JoystickPos pos = JoystickPos.Of(value);
-        Console.WriteLine($"  As joystick: X={pos.X} ({pos.XPercent:F3}), Y={pos.Y} ({pos.YPercent:F3}), Roll={pos.Roll} ({pos.RollPercent:F3})");
+        Console.WriteLine(pos);
     }
     else
     {
-        Console.WriteLine($"Row {row}: {bits} (bytes: {BitConverter.ToString(value)})");
+        Console.WriteLine($"Row {row}: {value[0]} (bytes: {BitConverter.ToString(value)})");
     }
+};
+parser.OnPressButton += (row, idx, pressed) =>
+{
+    Console.WriteLine($"Row {row}, button {idx}: {(pressed ? "pressed" : "released")}");
 };
 
 listener.Start();
@@ -98,7 +102,7 @@ static void QueryButton(PanelParser parser)
         return;
     }
 
-    Console.Write("Button inbdex: ");
+    Console.Write("Button index: ");
     if (!int.TryParse(Console.ReadLine(), out int button))
     {
         Console.WriteLine("Invalid button index.");

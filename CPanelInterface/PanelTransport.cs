@@ -28,7 +28,7 @@ public class PanelTransport : IDisposable
     /// <returns>The message encoded as ascii (excluding \r)</returns>
     public string PollMessage()
     {
-        StringBuilder sb = new StringBuilder(64);
+        StringBuilder sb = new StringBuilder(8);
         while (true)
         {
             int b = _port.ReadByte();
@@ -41,7 +41,6 @@ public class PanelTransport : IDisposable
     public void Dispose()
     {
         _port.Close();
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>
