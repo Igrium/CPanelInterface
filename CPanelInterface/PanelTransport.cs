@@ -15,6 +15,7 @@ public class PanelTransport : IDisposable
         _port = new SerialPort(portName, baudRate, parity, dataBits, stopBits);
         _port.ReadTimeout = 500_000;
         _port.WriteTimeout = 500;
+        _port.NewLine = "\r";
     }
 
     public void Open()
@@ -28,14 +29,12 @@ public class PanelTransport : IDisposable
     /// <returns>The message encoded as ascii (excluding \r)</returns>
     public string PollMessage()
     {
-        StringBuilder sb = new StringBuilder(8);
-        while (true)
-        {
-            int b = _port.ReadByte();
-            if (b == -1) throw new EndOfStreamException("Serial port closed while waiting for a message");
-            if (b == '\r') return sb.ToString();
-            sb.Append((char)b);
-        }
+        return _port.ReadLine();
+    }
+
+    public void PushMessage(string message)
+    {
+        _port.WriteLine(message);
     }
 
     public void Dispose()

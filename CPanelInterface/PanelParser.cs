@@ -2,8 +2,9 @@ using System.Collections.Concurrent;
 
 namespace CPanelInterface;
 
-
-
+/// <summary>
+/// Receives and parses messages from a panel
+/// </summary>
 public class PanelParser
 {
     /// <summary>
@@ -39,7 +40,7 @@ public class PanelParser
         Listener = listener;
         Listener.OnMessage += OnMessage;
 
-        Encoders.UnionWith([54, 55, 70, 71, 128, 144]);
+        Encoders.UnionWith([54, 55, 56, 70, 71, 128, 144]);
     }
 
     private void OnMessage(string message)

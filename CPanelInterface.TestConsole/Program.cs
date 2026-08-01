@@ -15,9 +15,13 @@ transport.Open();
 Console.WriteLine($"Opened {portName}. Listening for messages (Ctrl+C to exit)...");
 
 using var listener = new PanelTransport.Listener(transport);
+
 listener.OnError += ex => Console.WriteLine($"Error: {ex.Message}");
 
 var parser = new PanelParser(listener);
+var sender = new PanelSender(transport);
+
+sender.Reset();
 
 parser.OnUpdateJoystick += (row, joystick) =>
 {
@@ -32,6 +36,7 @@ parser.OnUpdateEncoder += (row, value) =>
 parser.OnPressButton += (row, idx, pressed) =>
 {
     Console.WriteLine($"Row {row}, button {idx}: {(pressed ? "pressed" : "released")}");
+    sender.SetLedState(row, idx, pressed);
 };
 
 listener.Start();
