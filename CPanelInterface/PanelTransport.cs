@@ -59,14 +59,16 @@ public class PanelTransport : IDisposable
         public event MessageHandler? OnMessage;
         public event ErrorHandler? OnError;
 
-        private Thread? _thread;
+        private volatile Thread? _thread;
 
-        public bool Running { get; private set; }
+        private volatile bool _running;
+        
+        public bool Running => _running;
 
         public void Start()
         {
             if (Running || _thread != null) throw new InvalidOperationException("Already started");
-            Running = true;
+            _running = true;
             _thread = new Thread(RunThread) { IsBackground = true };
             _thread.Start();
         }
@@ -99,7 +101,7 @@ public class PanelTransport : IDisposable
         /// </summary>
         public void Stop()
         {
-            Running = false;
+            _running = false;
         }
 
         /// <summary>
@@ -107,7 +109,7 @@ public class PanelTransport : IDisposable
         /// </summary>
         public void Dispose()
         {
-            Running = false;
+            _running = false;
             if (_thread != null && Thread.CurrentThread != _thread)
             {
                 _thread.Join();

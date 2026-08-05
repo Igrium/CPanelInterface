@@ -2,58 +2,50 @@ using System.Collections;
 using System.Text;
 using CPanelInterface;
 
-Console.Write("Enter serial port name (e.g. COM3 or /dev/tty.usbserial-XXXX): ");
-string? portName = Console.ReadLine();
-if (string.IsNullOrWhiteSpace(portName))
+Console.WriteLine("Searching for control surfaces...");
+
+IReadOnlyList<string> portNames = ChoosePorts();
+if (portNames.Count == 0)
 {
-    Console.WriteLine("No port name given, exiting.");
+    Console.WriteLine("No control surface selected, exiting.");
     return;
 }
 
-using var transport = new PanelTransport(portName);
-transport.Open();
-Console.WriteLine($"Opened {portName}. Listening for messages (Ctrl+C to exit)...");
-
-using var listener = new PanelTransport.Listener(transport);
-
-listener.OnError += ex => Console.WriteLine($"Error: {ex.Message}");
-
-var parser = new PanelParser(listener);
-var sender = new LedManager(transport);
-
-sender.Reset();
-
-parser.OnUpdateJoystick += (row, joystick) =>
+var panels = new List<Panel>();
+foreach (string name in portNames)
 {
-    Console.WriteLine($"Joystick {row}: ({joystick.X}, {joystick.Y}, {joystick.Roll})");
-};
+    try
+    {
+        panels.Add(Panel.Open(name, panels.Count));
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+    {
+        Console.WriteLine($"Could not open {name}: {ex.Message}");
+    }
+}
 
-parser.OnUpdateEncoder += (row, value) =>
+if (panels.Count == 0)
 {
-    Console.WriteLine($"Encoder {row}: {value}");
-};
+    Console.WriteLine("Nothing could be opened, exiting.");
+    return;
+}
 
-parser.OnPressButton += (button, pressed) =>
-{
-    Console.WriteLine($"Row {button.Row}, button {button.Idx}: {(pressed ? "pressed" : "released")}");
-    sender.SetLedState(button, pressed);
-};
-
-listener.Start();
+Console.WriteLine($"Opened {panels.Count} panel(s). Listening for messages (Ctrl+C to exit)...");
 
 Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
-    listener.Stop();
+    foreach (Panel panel in panels) panel.Listener.Stop();
 };
 
 PrintMenu();
 
-while (listener.IsOpen && listener.Running)
+// Quit once every panel has stopped -- one being unplugged shouldn't take the others down.
+while (panels.Any(p => p.Listener.IsOpen && p.Listener.Running))
 {
     if (Console.KeyAvailable)
     {
-        HandleKey(Console.ReadKey(intercept: true).KeyChar, parser);
+        HandleKey(Console.ReadKey(intercept: true).KeyChar, panels);
     }
     else
     {
@@ -62,6 +54,42 @@ while (listener.IsOpen && listener.Running)
 }
 
 Console.WriteLine("Listener stopped.");
+foreach (Panel panel in panels) panel.Dispose();
+
+// Auto-detect surfaces, falling back to asking when nothing can be confirmed.
+static IReadOnlyList<string> ChoosePorts()
+{
+    IReadOnlyList<PanelPortInfo> discovered = PanelDiscovery.DiscoverAll();
+
+    var confirmed = discovered.Where(p => p.Confidence == PanelConfidence.Confirmed).ToList();
+    if (confirmed.Count > 0)
+    {
+        foreach (PanelPortInfo panel in confirmed)
+        {
+            Console.WriteLine($"  Found {panel.Port} - {panel.Reason}");
+        }
+
+        return confirmed.Select(p => p.PortName).ToList();
+    }
+
+    // Nothing confirmed. Unconfirmed candidates are still worth offering, but not opening blindly.
+    if (discovered.Count > 0)
+    {
+        Console.WriteLine("No surface confirmed. Possible candidates:");
+        foreach (PanelPortInfo panel in discovered)
+        {
+            Console.WriteLine($"  {panel.Port} - {panel.Reason}");
+        }
+    }
+    else
+    {
+        Console.WriteLine("No surfaces or likely candidates found.");
+    }
+
+    Console.Write("Enter serial port name (e.g. COM3 or /dev/cu.usbserial-XXXX), or blank to quit: ");
+    string? manual = Console.ReadLine();
+    return string.IsNullOrWhiteSpace(manual) ? [] : [manual.Trim()];
+}
 
 static void PrintMenu()
 {
@@ -70,23 +98,52 @@ static void PrintMenu()
     Console.WriteLine();
 }
 
-static void HandleKey(char key, PanelParser parser)
+static void HandleKey(char key, List<Panel> panels)
 {
-    switch (char.ToLowerInvariant(key))
+    char lowered = char.ToLowerInvariant(key);
+    if (lowered == 'm')
+    {
+        PrintMenu();
+        return;
+    }
+
+    if (lowered is not ('b' or 'v' or 'j')) return;
+
+    Panel? panel = ChoosePanel(panels);
+    if (panel == null) return;
+
+    switch (lowered)
     {
         case 'b':
-            QueryButton(parser);
+            QueryButton(panel.Parser);
             break;
         case 'v':
-            QueryValue(parser);
+            QueryValue(panel.Parser);
             break;
         case 'j':
-            QueryJoystick(parser);
-            break;
-        case 'm':
-            PrintMenu();
+            QueryJoystick(panel.Parser);
             break;
     }
+}
+
+// Ask which panel a query applies to, skipping the prompt when there's only one.
+static Panel? ChoosePanel(List<Panel> panels)
+{
+    if (panels.Count == 1) return panels[0];
+
+    foreach (Panel panel in panels)
+    {
+        Console.WriteLine($"  [{panel.Index}] {panel.PortName}");
+    }
+
+    Console.Write("Panel: ");
+    if (int.TryParse(Console.ReadLine(), out int index) && index >= 0 && index < panels.Count)
+    {
+        return panels[index];
+    }
+
+    Console.WriteLine("Invalid panel.");
+    return null;
 }
 
 static bool TryReadRow(string prompt, out byte row)
@@ -160,4 +217,64 @@ static string ToBitString(BitArray bits)
     }
 
     return sb.ToString();
+}
+
+/// <summary>
+/// One open control surface and everything hanging off it. Output is prefixed with the panel index
+/// so several attached at once stay distinguishable.
+/// </summary>
+sealed class Panel : IDisposable
+{
+    public required int Index { get; init; }
+    public required string PortName { get; init; }
+    public required PanelTransport Transport { get; init; }
+    public required PanelTransport.Listener Listener { get; init; }
+    public required PanelParser Parser { get; init; }
+    public required LedManager Leds { get; init; }
+
+    public static Panel Open(string portName, int index)
+    {
+        var transport = new PanelTransport(portName);
+        transport.Open();
+
+        var listener = new PanelTransport.Listener(transport);
+        var leds = new LedManager(transport);
+
+        var panel = new Panel
+        {
+            Index = index,
+            PortName = portName,
+            Transport = transport,
+            Listener = listener,
+            Parser = new PanelParser(listener),
+            Leds = leds
+        };
+
+        leds.Reset();
+
+        string tag = $"[{index}]";
+
+        listener.OnError += ex => Console.WriteLine($"{tag} Error: {ex.Message}");
+
+        panel.Parser.OnUpdateJoystick += (row, joystick) =>
+            Console.WriteLine($"{tag} Joystick {row}: ({joystick.X}, {joystick.Y}, {joystick.Roll})");
+
+        panel.Parser.OnUpdateEncoder += (row, value) =>
+            Console.WriteLine($"{tag} Encoder {row}: {value}");
+
+        panel.Parser.OnPressButton += (button, pressed) =>
+        {
+            Console.WriteLine($"{tag} Row {button.Row}, button {button.Idx}: {(pressed ? "pressed" : "released")}");
+            leds.SetLedState(button, pressed);
+        };
+
+        listener.Start();
+        return panel;
+    }
+
+    public void Dispose()
+    {
+        Listener.Dispose();
+        Transport.Dispose();
+    }
 }

@@ -189,7 +189,8 @@ t=25.072 IN  ROW=0x10=FF   (release)
 - **T-bar → ack:** while the T-bar (IN `0x80`) streams position samples, the
   host emits OUT `8000\r` roughly once per 1–2 samples. Value is always `00`.
   Likely a flow-control / "position received" ack or a meter-refresh trigger.
-- **Heartbeat:** IN lone `\r` ~2 Hz when idle; unacked.
+- **Heartbeat:** IN lone `\r` ~2 Hz when idle; unacked. Only once telemetry has
+  been started — a freshly opened port sends nothing at all (§7.7).
 - No evidence the device needs per-message polling; after `T\r` it streams
   autonomously.
 
@@ -248,8 +249,14 @@ So: **~16 rows × 8 = up to 128 buttons**, **at least 5 rotary encoders/jog**
 5. **Encoder direction & detents** — confirm CW = increment, and counts per detent.
 6. **`I`/`V`/`T`** command semantics and the `~009`/`~00C` reply meaning
    (firmware/hardware id?). Also the `DSsD*nN` init blob.
-7. **Handshake requirement** — does the panel send anything before `T\r`, or is
-   `T\r` mandatory to start telemetry? (Relevant for the Linux driver's init.)
+7. **Handshake requirement — RESOLVED:** the panel is **completely silent until
+   spoken to.** Opening the port and waiting produces nothing at all — no
+   heartbeat, no telemetry — so `T\r` is **mandatory** to start the stream, and
+   the ~2 Hz idle heartbeat in §1 only runs *after* it. `I\r` and `V\r` are
+   answered immediately (`~009` / `~00C`) without starting telemetry, which makes
+   `I\r` the cheap way to test whether a port is a control surface. Confirmed
+   live 2026-08-04 against `cu.usbserial-FTYUVF8W`; used by
+   `PanelDiscovery.Probe`.
 8. **Joystick axis order** (which byte is X/Y/twist) and whether center is
    exactly `0x80` after calibration.
 
