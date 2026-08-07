@@ -140,4 +140,9 @@ public record struct Vec2I
 {
     public int X { get; set; }
     public int Y { get; set; }
+
+    public static Vec2I of(int x, int y)
+    {
+        return new Vec2I { X = x, Y = y };
+    }
 }

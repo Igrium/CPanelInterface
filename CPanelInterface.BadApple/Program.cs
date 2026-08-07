@@ -27,16 +27,27 @@ public static class Program
             .GetManifestResourceStream("CPanelInterface.BadApple.btnMapping.json")!;
 
         BtnMapping mapping = BtnMapping.Load(stream, "btnMapping.json");
-        Console.WriteLine("Loaded mappings");
-
+        
+        string folder = _getFolder();
+        if (!Directory.Exists(folder))
+        {
+            Console.WriteLine($"Folder {folder} does not exist.");
+            return;
+        }
+        
+        
         Panel panel = Panel.Open(ports[0]);
         panel.Listener.Start();
 
-        
-        while (!WantsExit && panel.Listener.IsOpen)
+        var frames = FrameReader.EnumerateFolder(folder, out var count);
+        var info = new VideoInfo
         {
-            Tick(panel);
-        }
+            Frames = frames,
+            Fps = 15,
+            NumFrames = count
+        };
+        
+        new Player(panel, mapping, info, .25f).Play();
     }
 
     public static void Exit()
@@ -47,6 +58,12 @@ public static class Program
     static void Tick(Panel panel)
     {
         Thread.Sleep(10);
+    }
+
+    static string _getFolder()
+    {
+        Console.WriteLine("Please enter the folder with frames");
+        return Console.ReadLine() ?? "";
     }
 }
 
