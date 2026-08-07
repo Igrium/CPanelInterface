@@ -2,9 +2,9 @@ namespace CPanelInterface;
 
 public record struct JoystickPos
 {
-    public byte X;
-    public byte Y;
-    public byte Roll;
+    public byte X { get; set; }
+    public byte Y { get; set; }
+    public byte Roll { get; set; }
 
     public float XPercent => X / 255f;
     public float YPercent => Y / 255f;

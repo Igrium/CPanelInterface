@@ -4,8 +4,8 @@ namespace CPanelInterface;
 
 public record struct ButtonRef
 {
-    public byte Row;
-    public byte Idx;
+    public byte Row { get; set; }
+    public byte Idx { get; set; }
 
     public static ButtonRef Of(byte row, byte idx)
     {
