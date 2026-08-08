@@ -1,18 +1,25 @@
+using System.Globalization;
 using SkiaSharp;
 
 namespace CPanelInterface.BadApple;
 
 public static class FrameReader
 {
+    /// <summary>
+    /// Sorts digit runs by value, so frame2.png lands before frame10.png even when the exporter
+    /// didn't zero-pad the numbers.
+    /// </summary>
+    private static readonly StringComparer NumericOrder =
+        StringComparer.Create(CultureInfo.InvariantCulture, CompareOptions.NumericOrdering);
+
     public static IEnumerable<SKBitmap> EnumerateFolder(string folder, out int count)
     {
-        string[] files = Directory.GetFiles(folder);
-        count = 0;
-        foreach (var file in files)
-        {
-            if (file.EndsWith(".png")) count++;
-        }
+        // Directory.GetFiles returns filesystem order, so frames have to be sorted before playback.
+        string[] files = Directory.GetFiles(folder, "*.png")
+            .OrderBy(Path.GetFileName, NumericOrder)
+            .ToArray();
 
+        count = files.Length;
         return _enumerateFolderInternal(files);
     }
 
@@ -20,7 +27,6 @@ public static class FrameReader
     {
         foreach (var file in files)
         {
-            if (!file.EndsWith(".png")) continue;
             yield return SKBitmap.Decode(file);
         }
     }

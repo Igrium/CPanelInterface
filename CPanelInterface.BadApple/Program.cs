@@ -8,6 +8,8 @@ public static class Program
     
     public static bool WantsExit => _wantsExit;
 
+    private static readonly ButtonRef Play = ButtonRef.Of(66, 2);
+
     public static void Main(string[] args)
     {
         // MappingProgram.GenMappings();
@@ -40,6 +42,12 @@ public static class Program
         panel.Listener.Start();
 
         var frames = FrameReader.EnumerateFolder(folder, out var count);
+
+        Console.WriteLine("Waiting for start button");
+        panel.WaitForButton(Play).Wait();
+        Console.WriteLine("Playing on board");
+        panel.Leds.SetLedState(Play, true);
+        
         var info = new VideoInfo
         {
             Frames = frames,
@@ -47,17 +55,8 @@ public static class Program
             NumFrames = count
         };
         
-        new Player(panel, mapping, info, .25f).Play();
-    }
-
-    public static void Exit()
-    {
-        _wantsExit = true;
-    }
-
-    static void Tick(Panel panel)
-    {
-        Thread.Sleep(10);
+        new Player(panel, mapping, info).Play();
+        Console.WriteLine("Bad Apple Complete!");
     }
 
     static string _getFolder()

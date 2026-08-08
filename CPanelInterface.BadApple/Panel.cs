@@ -40,6 +40,20 @@ public sealed class Panel : IDisposable
         Transport.Dispose();
     }
 
+    public Task WaitForButton(ButtonRef btn)
+    {
+        var tcs = new TaskCompletionSource();
+        Parser.OnPressButton += (b, _) =>
+        {
+            if (b == btn)
+            {
+                tcs.TrySetResult();
+            }
+        };
+        
+        return tcs.Task;
+    }
+
     public static IReadOnlyList<string> ChoosePorts()
     {
         IReadOnlyList<PanelPortInfo> discovered = PanelDiscovery.DiscoverAll();
